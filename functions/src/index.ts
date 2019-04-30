@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { GetSignedUrlConfig } from '@google-cloud/storage';
 
 admin.initializeApp();
 
@@ -20,13 +21,31 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
     }
 
     const [fileObjects] = await bucket.getFiles(options);
-    fileObjects.forEach(async file => {
+    const videoURLs: string[] = [];
+    let thumbnailURL;
+    for (var i = 0; i < fileObjects.length; i++) {
+      const file = fileObjects[i];
       const nameArr = file.name.split('/');
       const name = nameArr[nameArr.length - 1];
-      await file.copy(`${newAssetsPath}/${name}`);
-      await file.
-    })
+      const copyResponse = await file.copy(`${newAssetsPath}/${name}`);
+      const newFile = copyResponse[0];
+      const cfg: GetSignedUrlConfig = {                                                                      
+        action: 'read',                                                               
+        expires: '03-01-2500',                                                        
+      };
+      const signedURL = await newFile.getSignedUrl(cfg);
+      console.log(`signedURL for ${newFile.name}`, signedURL);
+      if (name.split('.')[1] === 'mp4') {
+        videoURLs.push(signedURL[0])
+      }
+      if (name.split('.')[0] === 'thumbnail') {
+        thumbnailURL = signedURL
+      }
+    }
 
-    response.send(fileObjects);
+    response.send({
+      thumbnailURL: thumbnailURL,
+      videoURLs: videoURLs
+    });
   })
 })
