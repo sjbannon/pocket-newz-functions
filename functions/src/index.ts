@@ -12,8 +12,18 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 export const cloneNewzAssets = functions.https.onRequest((request, response) => {
   cors(request, response, async () => {
     const pathUrlPrefix = 'NewzReels';
-    const oldNewzId = request.query.oldNewzId;
-    const newNewzId = request.query.newNewzId;
+    console.log('request', request)
+    console.log('request.query', request.query)
+    console.log('request.params', request.params)
+    console.log('request.body', request.body)
+    console.log('request.rawBody', request.rawBody)
+    let oldNewzId = request.query.oldNewzId || request.params.oldNewzId;
+    let newNewzId = request.query.newNewzId || request.params.newNewzId;
+    if (request.body.data) {
+      oldNewzId = request.body.data.oldNewzId;
+      newNewzId = request.body.data.newNewzId;
+    }
+    console.log(`oldNewzId: ${oldNewzId} | newNewzId: ${newNewzId}`);
     const newAssetsPath = `${pathUrlPrefix}/${newNewzId}`
 
     const options = {
@@ -35,7 +45,7 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
       };
       const signedURL = await newFile.getSignedUrl(cfg);
       console.log(`signedURL for ${newFile.name}`, signedURL);
-      if (name.split('.')[1] === 'mp4') {
+      if (name.split('.')[1] === 'mp4' || name.split('.')[1] === 'jpg' || name.split('.')[1] === 'png') {
         videoURLs.push(signedURL[0])
       }
       if (name.split('.')[0] === 'thumbnail') {
@@ -43,9 +53,11 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
       }
     }
 
-    response.send({
-      thumbnailURL: thumbnailURL,
-      videoURLs: videoURLs
+    response.status(200).send({
+      data: {
+        thumbnailURL: thumbnailURL,
+        videoURLs: videoURLs
+      }
     });
   })
 })
