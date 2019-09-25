@@ -125,3 +125,164 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
     });
   })
 })
+
+// Newz Added
+export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreate(async (snap, context) => {
+  try {
+    const newzItem = snap.data();
+    if (newzItem) {
+      const stationIDs = newzItem.stationIDs;
+      const ownerID = newzItem.ownerID;
+      const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
+      if (!newzerStats.exists) {
+        console.log(`the document ${ownerID} does not exist`);
+      } else {
+        const newzerStatsData = newzerStats.data();
+        if (newzerStatsData) {
+          const newCount = newzerStatsData.newzCount + 1;
+          await db.collection('NewzerStats').doc(ownerID).update({
+            newzCount: newCount
+          })
+        } else {
+          console.log(`There is no info for NewzerStats/${ownerID}`);
+        }
+      }
+      stationIDs.forEach(async (stationID: string) => {
+        const stationRef = await db.collection('StationRef').doc(stationID).get();
+        if (!stationRef.exists) {
+          console.log(`the document ${stationID} does not exist`);
+        } else {
+          const stationInfo = stationRef.data();
+          if (stationInfo) {
+            const newCount = stationInfo.newzCount + 1;
+            await db.collection('StationRef').doc(stationID).update({
+              newzCount: newCount
+            })
+          } else {
+            console.log(`There is no station info for ${stationID}`);
+          }
+        }
+      })
+    } else {
+      console.log('There was no newzItem');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+})
+
+// Newz Destroyed
+export const onNewzDestroyed = functions.firestore.document('Newz/{newzId}').onDelete(async (snap, context) => {
+  try {
+    const newzItem = snap.data();
+    if (newzItem) {
+      const stationIDs = newzItem.stationIDs;
+      const ownerID = newzItem.ownerID;
+      const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
+      if (!newzerStats.exists) {
+        console.log(`the document ${ownerID} does not exist`);
+      } else {
+        const newzerStatsData = newzerStats.data();
+        if (newzerStatsData) {
+          const newCount = newzerStatsData.newzCount - 1;
+          await db.collection('NewzerStats').doc(ownerID).update({
+            newzCount: newCount < 0 ? 0 : newCount
+          })
+        } else {
+          console.log(`There is no info for NewzerStats/${ownerID}`);
+        }
+      }
+      stationIDs.forEach(async (stationID: string) => {
+        const stationRef = await db.collection('StationRef').doc(stationID).get();
+        if (!stationRef.exists) {
+          console.log(`the document ${stationID} does not exist`);
+        } else {
+          const stationInfo = stationRef.data();
+          if (stationInfo) {
+            const newCount = stationInfo.newzCount - 1;
+            await db.collection('StationRef').doc(stationID).update({
+              newzCount: newCount < 0 ? 0 : newCount
+            })
+          } else {
+            console.log(`There is no station info for ${stationID}`);
+          }
+        }
+      })
+    } else {
+      console.log('There was no newzItem');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+})
+
+// Newz Rating
+
+// Follow Newzer
+
+// Number of Stations
+export const onStationCreated = functions.firestore.document('Stations/{stationID}').onCreate(async (snap, context) => {
+  try {
+    const stationRef = snap.data();
+    if (stationRef) {
+      const stationKey = stationRef.key;
+      if (stationKey) {
+        const stationKeyArr = stationKey.split('/');
+        const ownerID = stationKeyArr[1];
+        const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
+        if (!newzerStats.exists) {
+          console.log(`the document ${ownerID} does not exist`);
+        } else {
+          const newzerStatsData = newzerStats.data();
+          if (newzerStatsData) {
+            const newCount = newzerStatsData.newzCount + 1;
+            await db.collection('NewzerStats').doc(ownerID).update({
+              newzCount: newCount
+            })
+          } else {
+            console.log(`There is no info for NewzerStats/${ownerID}`);
+          }
+        }
+      } else {
+        console.log('There was no StationKey');
+      }
+    } else {
+      console.log('There was no StationRef');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+});
+
+export const onStationDestroyed = functions.firestore.document('StationRef/{stationID}').onDelete(async (snap, context) => {
+  try {
+    const stationRef = snap.data();
+    if (stationRef) {
+      const stationKey = stationRef.key;
+      if (stationKey) {
+        const stationKeyArr = stationKey.split('/');
+        const ownerID = stationKeyArr[1];
+        const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
+        if (!newzerStats.exists) {
+          console.log(`the document ${ownerID} does not exist`);
+        } else {
+          const newzerStatsData = newzerStats.data();
+          if (newzerStatsData) {
+            const newCount = newzerStatsData.newzCount - 1;
+            await db.collection('NewzerStats').doc(ownerID).update({
+              newzCount: newCount < 0 ? 0 : newCount
+            })
+          } else {
+            console.log(`There is no info for NewzerStats/${ownerID}`);
+          }
+        }
+      } else {
+        console.log('There was no StationKey');
+      }
+    } else {
+      console.log('There was no StationRef');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+});
