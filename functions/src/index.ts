@@ -217,9 +217,8 @@ export const onNewzDestroyed = functions.firestore.document('Newz/{newzId}').onD
 })
 
 // Newz Rating
-
-// Follow Newzer TODO: make this work
-export const followNewzer = functions.https.onRequest((request, response) => {
+// requires newzID and rating params
+export const newzRating = functions.https.onRequest(async (request, response) => {
   cors(request, response, () => {
     try {
       if (request.method !== 'POST') {
@@ -235,32 +234,111 @@ export const followNewzer = functions.https.onRequest((request, response) => {
         admin.auth().verifyIdToken(tokenId)
           .then(async (decoded) => {
             // res.status(200).send(decoded)
+            var uid = decoded.uid; // user that is doing the rating
+            let newzID = request.query.newzID || request.params.newzID; // newz to be rated
+            let rating = request.query.rating || request.params.rating; // rating score
+
+            if(newzID && uid) {
+              const ratingsRef = db.collection('Ratings').doc(newzID);
+              const myRatingsRef = ratingsRef.collection('MyRatings');
+
+              await myRatingsRef.doc(uid).set({myRating: rating});
+
+              let counter = 0;
+              let totalRating = 0;
+
+              const avgRatingRef = ratingsRef.collection('AvgRating');
+              const allRatingsSnap = await myRatingsRef.get();
+
+              allRatingsSnap.forEach((documentSnapshot) => {
+                let doc = documentSnapshot.data();
+                counter = counter + 1;
+                totalRating = totalRating + doc.myRating;
+              })
+
+              const newAvg = totalRating / counter;
+              await avgRatingRef.doc(newzID).update({avgRating: newAvg});
+
+              // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
+
+              const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
+              await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
+
+              response.send({ status: 'success', avgRating: newAvg });
+            } else {
+              console.log('No following or followers')
+              response.send({ status: 'failed' });
+            }            
+            
+          }).catch((err) => response.status(401).send(err));
+      }
+    } catch (error) {
+      response.statusCode = 500;
+      response.send(error);
+    }
+  });
+});
+
+// Follow Newzer
+// Only need the ID of user to follow. The follower is the user that is sending the request
+// and we'll receive the token to figure out who they are.
+export const followNewzer = functions.https.onRequest(async (request, response) => {
+  cors(request, response, () => {
+    try {
+      if (request.method !== 'POST') {
+        response.status(400).send('not a POST method');
+        return;
+      }
+
+      const authorization = request.get('Authorization');
+
+      if (authorization) {
+        const tokenId = authorization.split('Bearer ')[1];
+
+        admin.auth().verifyIdToken(tokenId)
+          .then(async (decoded) => {
+            // res.status(200).send(decoded)
+            let following, followers;
             var followerId = decoded.uid; // user that is doing the following
             let followId = request.query.followId || request.params.followId; // user being followed
 
-            const newzerFollowsRef = db.collection('NewzerFollows').doc(followerId); // user that is doing the following
+            const newzerFollowsRef = db.collection('NewzerFollows').doc(followerId)
+            const newzerFollowsSnap = await newzerFollowsRef.get(); // user that is doing the following
+
             const newzerStatsRef = db.collection('NewzerStats').doc(followId); // user being followed
+            const newzerStatsSnap = await newzerStatsRef.get();
 
-            const newzerFollowsSnapshot = await newzerFollowsRef.get();
-            const newzerStatsSnapshot = await newzerStatsRef.get();
-
-            newzerStatsSnapshot.then(doc => {
-              let followers = doc.data().followers
-            }).followers
-            let following = newzerFollowsRef.following
-
-            if(following.includes(followId)) {
-              following.splice(following.indexOf(followId), 1)
-              followers = followers - 1
-            } else {
-              following.push(followId)
-              followers = followers + 1
+            if(newzerStatsSnap.exists) {
+              const newzerStats = newzerStatsSnap.data();
+              if(newzerStats) {
+                followers = newzerStats.followers
+              }
             }
+            
+            if(newzerFollowsSnap.exists) {
+              const newzerFollows = newzerFollowsSnap.data();
+              if(newzerFollows) {
+                following = newzerFollows.following
+              }
+            }            
 
-            newzerFollowsRef.update({following: following})
-            newzerStatsRef.update({followers: followers})
+            if(following && followers) {
+              if(following.includes(followId)) {
+                following.splice(following.indexOf(followId), 1)
+                followers = followers - 1
+              } else {
+                following.push(followId)
+                followers = followers + 1
+              }
 
-            response.send({ status: 'success', following: following, followers: followers });
+              await newzerFollowsRef.update({following: following})
+              await newzerStatsRef.update({followers: followers})
+
+              response.send({ status: 'success', following: following, followers: followers });
+            } else {
+              console.log('No following or followers')
+              response.send({ status: 'failed' });
+            }
           }).catch((err) => response.status(401).send(err));
       }
     } catch (error) {
