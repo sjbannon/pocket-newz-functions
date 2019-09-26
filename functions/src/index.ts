@@ -125,3 +125,54 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
     });
   })
 })
+
+export const followNewzer = functions.https.onRequest((request, response) => {
+  cors(request, response, () => {
+    try {
+      if (request.method !== 'POST') {
+        response.status(400).send('not a POST method');
+        return;
+      }
+
+      const authorization = request.get('Authorization');
+
+      if (authorization) {
+        const tokenId = authorization.split('Bearer ')[1];
+
+        admin.auth().verifyIdToken(tokenId)
+          .then(async (decoded) => {
+            // res.status(200).send(decoded)
+            var followerId = decoded.uid; // user that is doing the following
+            let followId = request.query.followId || request.params.followId; // user being followed
+
+            const newzerFollowsRef = db.collection('NewzerFollows').doc(followerId); // user that is doing the following
+            const newzerStatsRef = db.collection('NewzerStats').doc(followId); // user being followed
+
+            const newzerFollowsSnapshot = await newzerFollowsRef.get();
+            const newzerStatsSnapshot = await newzerStatsRef.get();
+
+            newzerStatsSnapshot.then(doc => {
+              let followers = doc.data().followers
+            }).followers
+            let following = newzerFollowsRef.following
+
+            if(following.includes(followId)) {
+              following.splice(following.indexOf(followId), 1)
+              followers = followers - 1
+            } else {
+              following.push(followId)
+              followers = followers + 1
+            }
+
+            newzerFollowsRef.update({following: following})
+            newzerStatsRef.update({followers: followers})
+
+            response.send({ status: 'success', following: following, followers: followers });
+          }).catch((err) => response.status(401).send(err));
+      }
+    } catch (error) {
+      response.statusCode = 500;
+      response.send(error);
+    }
+  });
+});
