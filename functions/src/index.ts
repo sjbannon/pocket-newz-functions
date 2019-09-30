@@ -2,6 +2,10 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { GetSignedUrlConfig } from '@google-cloud/storage';
 
+const SENDGRID_API_KEY = functions.config().sendgrid.key;
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(SENDGRID_API_KEY);
+
 admin.initializeApp();
 
 const cors = require('cors')({ origin: true });
@@ -163,6 +167,35 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
           }
         }
       })
+
+      const metricsRef = db.collection('Metrics').doc(newzItem.id);
+      await metricsRef.set({
+        views: 0
+      })
+
+      if(newzItem.ownerID !== newzItem.posterID) {
+        const newzPosterRef = db.collection('UserInfo').doc(newzItem.posterID);
+        const newzPosterSnap = await newzPosterRef.get();
+        const newzPosterData = newzPosterSnap.data();
+        
+        if(newzPosterData) {
+          const msg = {
+            to: newzPosterData.email,
+            from: 'noreply@pocketnewz.com',
+            subject:  'Pocket Newz - Successfully Contributed',
+            // custom templates
+            templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
+            substitutionWrappers: ['{{', '}}'],
+            substitutions: {
+              name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
+              title: newzItem.title
+            }
+          };
+
+          sgMail.send(msg)
+          console.log(`Email Sent to ${newzPosterData.email}!`)
+        }
+      }
     } else {
       console.log('There was no newzItem');
     }
@@ -414,3 +447,48 @@ export const onStationDestroyed = functions.firestore.document('StationRef/{stat
     console.log('err', err);
   }
 });
+
+export const collaboratorAdded = functions.firestore.document('Stations/{userID}/Collaborating/{stationID}').onCreate(async (snap, context) => {
+  try {
+    const collabStationData = snap.data();
+
+    const userID = context.params.userID;
+    const userRef = db.collection('UserInfo').doc(userID);
+    const userSnap = await userRef.get();
+    const user = userSnap.data();
+
+    if (collabStationData && user) {
+      const stationRef =    db.doc(collabStationData.stationRef);
+      const stationSnap = await stationRef.get();
+      const stationData = stationSnap.data();
+
+      const stationOwnerID = collabStationData.ownerID;
+      const stationOwnerRef = db.collection('UserInfo').doc(stationOwnerID);
+      const stationOwnerSnap = await stationOwnerRef.get();
+      const stationOwnerData = stationOwnerSnap.data();
+
+      if(stationData && stationOwnerData) {
+        const msg = {
+          to: user.email,
+          from: 'noreply@pocketnewz.com',
+          subject:  'Pocket Newz - Added as Contributor',
+          // custom templates
+          templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
+          substitutionWrappers: ['{{', '}}'],
+          substitutions: {
+            contributorName: `${user.firstName} ${user.lastName}`,
+            stationUsername: `${stationOwnerData.firstName} ${stationOwnerData.lastName}`,
+            stationName: stationData.title,
+            stationID: stationData.id
+          }
+        };
+
+        return sgMail.send(msg)
+      }
+    } else {
+      console.log('No user or collab station found.');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+})
