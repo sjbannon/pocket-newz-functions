@@ -182,7 +182,7 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
           const msg = {
             to: newzPosterData.email,
             from: 'noreply@pocketnewz.com',
-            subject:  'Pocket Newz - Successfully Contributed',
+            subject: 'Pocket Newz - Successfully Contributed',
             // custom templates
             templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
             substitutionWrappers: ['{{', '}}'],
@@ -251,134 +251,142 @@ export const onNewzDestroyed = functions.firestore.document('Newz/{newzId}').onD
 
 // Newz Rating
 // requires newzID and rating params
-export const newzRating = functions.https.onRequest(async (request, response) => {
-  cors(request, response, () => {
-    try {
-      if (request.method !== 'POST') {
-        response.status(400).send('not a POST method');
-        return;
+export const newzRating = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is doing the rating
+      let newzID = data.newzID; // newz to be rated
+      let rating = data.rating; // rating score
+
+      // Checking attributes.
+      if ( (!newzID || newzID.length === 0) || (!rating || rating <= 0) ) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+            'two arguments "newzID" and "rating".');
+      }
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
       }
 
-      const authorization = request.get('Authorization');
+      const ratingsRef = db.collection('Ratings').doc(newzID);
+      const myRatingsRef = ratingsRef.collection('MyRatings');
 
-      if (authorization) {
-        const tokenId = authorization.split('Bearer ')[1];
+      await myRatingsRef.doc(uid).set({myRating: rating});
 
-        admin.auth().verifyIdToken(tokenId)
-          .then(async (decoded) => {
-            // res.status(200).send(decoded)
-            var uid = decoded.uid; // user that is doing the rating
-            let newzID = request.query.newzID || request.params.newzID; // newz to be rated
-            let rating = request.query.rating || request.params.rating; // rating score
+      let counter = 0;
+      let totalRating = 0;
 
-            if(newzID && uid) {
-              const ratingsRef = db.collection('Ratings').doc(newzID);
-              const myRatingsRef = ratingsRef.collection('MyRatings');
+      const avgRatingRef = ratingsRef.collection('AvgRating');
+      const allRatingsSnap = await myRatingsRef.get();
 
-              await myRatingsRef.doc(uid).set({myRating: rating});
+      allRatingsSnap.forEach((documentSnapshot) => {
+        let doc = documentSnapshot.data();
+        counter = counter + 1;
+        totalRating = totalRating + doc.myRating;
+      })
 
-              let counter = 0;
-              let totalRating = 0;
+      const newAvg = totalRating / counter;
+      await avgRatingRef.doc(newzID).update({avgRating: newAvg});
 
-              const avgRatingRef = ratingsRef.collection('AvgRating');
-              const allRatingsSnap = await myRatingsRef.get();
+      // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
 
-              allRatingsSnap.forEach((documentSnapshot) => {
-                let doc = documentSnapshot.data();
-                counter = counter + 1;
-                totalRating = totalRating + doc.myRating;
-              })
+      const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
+      await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
 
-              const newAvg = totalRating / counter;
-              await avgRatingRef.doc(newzID).update({avgRating: newAvg});
-
-              // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
-
-              const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
-              await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
-
-              response.send({ status: 'success', avgRating: newAvg });
-            } else {
-              console.log('No following or followers')
-              response.send({ status: 'failed' });
-            }            
-            
-          }).catch((err) => response.status(401).send(err));
-      }
-    } catch (error) {
-      response.statusCode = 500;
-      response.send(error);
+      return { status: 'success', avgRating: newAvg };
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
     }
-  });
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
 });
 
 // Follow Newzer
 // Only need the ID of user to follow. The follower is the user that is sending the request
 // and we'll receive the token to figure out who they are.
-export const followNewzer = functions.https.onRequest(async (request, response) => {
-  cors(request, response, () => {
-    try {
-      if (request.method !== 'POST') {
-        response.status(400).send('not a POST method');
-        return;
+export const followNewzer = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      let following, followers;
+      var followerId = context.auth.uid; // user that is doing the following
+      let followId = data.followID; // user being followed
+      console.log('IDs', followerId, followId);
+
+      // Checking attributes.
+      if (!followId || followId.length === 0) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+            'one arguments "followID" containing the ID of the user to follow.');
+      }
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
       }
 
-      const authorization = request.get('Authorization');
+      if(followerId && followId) {
+        const newzerFollowsRef = db.collection('NewzerFollows').doc(followerId)
+        const newzerFollowsSnap = await newzerFollowsRef.get(); // user that is doing the following
 
-      if (authorization) {
-        const tokenId = authorization.split('Bearer ')[1];
+        const newzerStatsRef = db.collection('NewzerStats').doc(followId); // user being followed
+        const newzerStatsSnap = await newzerStatsRef.get();
 
-        admin.auth().verifyIdToken(tokenId)
-          .then(async (decoded) => {
-            // res.status(200).send(decoded)
-            let following, followers;
-            var followerId = decoded.uid; // user that is doing the following
-            let followId = request.query.followId || request.params.followId; // user being followed
+        if(newzerStatsSnap.exists) {
+          const newzerStats = newzerStatsSnap.data();
+          if(newzerStats) {
+            followers = newzerStats.followers || 0;
+          }
+        }
+        
+        if(newzerFollowsSnap.exists) {
+          const newzerFollows = newzerFollowsSnap.data();
+          if(newzerFollows) {
+            following = newzerFollows.following || [];
+          }
+        }
+        
+        // Checking data is valid.
+        if (following === undefined) {
+          // Throwing an HttpsError so that the client gets the error details.
+          throw new functions.https.HttpsError('not-found', 'The function could not retrieve the authenticated user with ID: '+followerId);
+        }
+        if (followers === undefined) {
+          // Throwing an HttpsError so that the client gets the error details.
+          throw new functions.https.HttpsError('not-found', 'The function could not retrieve the user to follow with ID: '+followId);
+        }
 
-            const newzerFollowsRef = db.collection('NewzerFollows').doc(followerId)
-            const newzerFollowsSnap = await newzerFollowsRef.get(); // user that is doing the following
+        if(following.includes(followId)) {
+          following.splice(following.indexOf(followId), 1);
+          followers = (followers <= 1 ? 0 : followers - 1);
+        } else {
+          following.push(followId);
+          followers = followers + 1;
+        }
 
-            const newzerStatsRef = db.collection('NewzerStats').doc(followId); // user being followed
-            const newzerStatsSnap = await newzerStatsRef.get();
+        await newzerFollowsRef.update({following: following})
+        await newzerStatsRef.update({followers: (followers >= 0 ? followers : 0)})
 
-            if(newzerStatsSnap.exists) {
-              const newzerStats = newzerStatsSnap.data();
-              if(newzerStats) {
-                followers = newzerStats.followers
-              }
-            }
-            
-            if(newzerFollowsSnap.exists) {
-              const newzerFollows = newzerFollowsSnap.data();
-              if(newzerFollows) {
-                following = newzerFollows.following
-              }
-            }            
-
-            if(following && followers) {
-              if(following.includes(followId)) {
-                following.splice(following.indexOf(followId), 1)
-                followers = followers - 1
-              } else {
-                following.push(followId)
-                followers = followers + 1
-              }
-
-              await newzerFollowsRef.update({following: following})
-              await newzerStatsRef.update({followers: followers})
-
-              response.send({ status: 'success', following: following, followers: followers });
-            } else {
-              console.log('No following or followers')
-              response.send({ status: 'failed' });
-            }
-          }).catch((err) => response.status(401).send(err));
+        return { status: 'success', following: following, followers: followers };        
+      } else {
+        throw new functions.https.HttpsError('not-found', 'The function could not retrieve the following or follower user');
       }
-    } catch (error) {
-      response.statusCode = 500;
-      response.send(error);
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
     }
-  });
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
 });
 
 // Number of Stations
@@ -471,7 +479,7 @@ export const collaboratorAdded = functions.firestore.document('Stations/{userID}
         const msg = {
           to: user.email,
           from: 'noreply@pocketnewz.com',
-          subject:  'Pocket Newz - Added as Contributor',
+          subject: 'Pocket Newz - Added as Contributor',
           // custom templates
           templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
           substitutionWrappers: ['{{', '}}'],
