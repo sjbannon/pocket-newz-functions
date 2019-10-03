@@ -241,6 +241,33 @@ export const onNewzDestroyed = functions.firestore.document('Newz/{newzId}').onD
           }
         }
       })
+
+      await db.collection('Metrics').doc(newzItem.id).delete().then(function() {
+        console.log("Metrics successfully deleted!");
+      }).catch(function(error) {
+          console.error("Error removing metrics: ", error);
+      });
+
+      await db.collection('Comments').doc(newzItem.id).delete().then(function() {
+        console.log("Comments successfully deleted!");
+      }).catch(function(error) {
+        console.error("Error removing comments: ", error);
+      });
+
+      await db.collection('Ratings').doc(newzItem.id).delete().then(function() {
+        console.log("Ratings successfully deleted!");
+      }).catch(function(error) {
+        console.error("Error removing ratings: ", error);
+      });
+
+      await bucket.deleteFiles({
+        prefix: `NewzReels/${newzItem.id}`
+      }).then(function() {
+        console.log("NewzReels successfully deleted!");
+      }).catch(function(error) {
+        console.error("Error removing NewzReels: ", error);
+      });
+            
     } else {
       console.log('There was no newzItem');
     }
@@ -257,6 +284,8 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       var uid = context.auth.uid; // user that is doing the rating
       let newzID = data.newzID; // newz to be rated
       let rating = data.rating; // rating score
+
+      console.log('IDs and rating: ', uid, newzID, rating)
 
       // Checking attributes.
       if ( (!newzID || newzID.length === 0) || (!rating || rating <= 0) ) {
@@ -279,7 +308,7 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       let counter = 0;
       let totalRating = 0;
 
-      const avgRatingRef = ratingsRef.collection('AvgRating');
+      const avgRatingRef = ratingsRef.collection('AvgRating').doc(newzID);
       const allRatingsSnap = await myRatingsRef.get();
 
       allRatingsSnap.forEach((documentSnapshot) => {
@@ -289,7 +318,7 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       })
 
       const newAvg = totalRating / counter;
-      await avgRatingRef.doc(newzID).update({avgRating: newAvg});
+      await avgRatingRef.set({avgRating: newAvg});
 
       // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
 
@@ -389,6 +418,70 @@ export const followNewzer = functions.https.onCall(async (data, context) => {
   }
 });
 
+// View Newz
+// requires newzID
+export const viewNewz = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is doing the rating
+      let newzID = data.newzID; // newz to be rated
+
+      console.log('IDs and rating: ', uid, newzID)
+
+      // Checking attributes.
+      if (!newzID || newzID.length === 0) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+            'one argument "newzID".');
+      }
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+      }
+
+      const newzRef = db.collection('Newz').doc(newzID);
+      const newzSnap = await newzRef.get();
+      const newzData = newzSnap.data();
+
+      if(newzData && (uid !== newzData.ownerID)) {
+        const newzViewUserRef = db.collection('NewzViews').doc(uid);
+        const newzViewRef = newzViewUserRef.collection('views').doc(newzID)
+
+        const newzViewSnap = await newzViewRef.get();
+
+        const metricsRef = db.collection('Metrics').doc(newzID);
+        const metricsSnap = await metricsRef.get();
+        const metricsData = metricsSnap.data();
+
+        let newViews = 0;
+
+        if(metricsData) {
+          newViews = metricsData.views;
+        }
+
+        if(!newzViewSnap.exists) {
+          newViews += 1;
+          await metricsRef.set({views: newViews || 0});
+          await newzViewRef.set({viewed: true})
+        }
+        return { status: 'success', newViews: newViews };
+      } else {
+        console.log('User owns that newz item')
+        throw new functions.https.HttpsError('aborted', 'User owns that newz item.');
+      }
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+    }
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
+});
+
 // Number of Stations
 export const onStationCreated = functions.firestore.document('Stations/{stationID}').onCreate(async (snap, context) => {
   try {
@@ -404,9 +497,9 @@ export const onStationCreated = functions.firestore.document('Stations/{stationI
         } else {
           const newzerStatsData = newzerStats.data();
           if (newzerStatsData) {
-            const newCount = newzerStatsData.newzCount + 1;
+            const newCount = newzerStatsData.stations + 1;
             await db.collection('NewzerStats').doc(ownerID).update({
-              newzCount: newCount
+              stations: newCount
             })
           } else {
             console.log(`There is no info for NewzerStats/${ownerID}`);
@@ -437,9 +530,9 @@ export const onStationDestroyed = functions.firestore.document('StationRef/{stat
         } else {
           const newzerStatsData = newzerStats.data();
           if (newzerStatsData) {
-            const newCount = newzerStatsData.newzCount - 1;
+            const newCount = newzerStatsData.stations - 1;
             await db.collection('NewzerStats').doc(ownerID).update({
-              newzCount: newCount < 0 ? 0 : newCount
+              stations: newCount < 0 ? 0 : newCount
             })
           } else {
             console.log(`There is no info for NewzerStats/${ownerID}`);
