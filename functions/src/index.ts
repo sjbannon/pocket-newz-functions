@@ -337,6 +337,62 @@ export const newzRating = functions.https.onCall(async (data, context) => {
   }
 });
 
+export const newzShared = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is doing the rating
+      let newzID = data.newzID; // newz to be rated
+      
+      // Checking attributes.
+      if (!newzID || newzID.length === 0) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+            'one argument "newzID".');
+      }
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+      }
+
+      const ratingsRef = db.collection('Ratings').doc(newzID);
+      const myRatingsRef = ratingsRef.collection('MyRatings');
+
+      await myRatingsRef.doc(uid).set({myRating: rating});
+
+      let counter = 0;
+      let totalRating = 0;
+
+      const avgRatingRef = ratingsRef.collection('AvgRating').doc(newzID);
+      const allRatingsSnap = await myRatingsRef.get();
+
+      allRatingsSnap.forEach((documentSnapshot) => {
+        let doc = documentSnapshot.data();
+        counter = counter + 1;
+        totalRating = totalRating + doc.myRating;
+      })
+
+      const newAvg = totalRating / counter;
+      await avgRatingRef.set({avgRating: newAvg});
+
+      // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
+
+      const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
+      await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
+
+      return { status: 'success', avgRating: newAvg };
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+    }
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
+});
+
 // Follow Newzer
 // Only need the ID of user to follow. The follower is the user that is sending the request
 // and we'll receive the token to figure out who they are.
@@ -480,6 +536,74 @@ export const viewNewz = functions.https.onCall(async (data, context) => {
     console.log('failed', error)
     throw new functions.https.HttpsError('internal', error);
   }
+});
+
+// View Newz
+// requires newzID
+export const viewSharedNewz = functions.https.onRequest((request, response) => {
+  cors(request, response, async () => {
+    try {
+      console.log('request.body', request.body)
+      const newzID = request.body.newzID;
+
+      if (request.method != "POST") {
+        response.status(400).send("Incorrect request method.");
+        return;
+      }
+    
+      if (newzID) {
+        const newzRef = db.collection('Newz').doc(newzID);
+        const newzSnap = await newzRef.get();
+        const newzData = newzSnap.data();
+
+        if(newzData && newzData.isPublic) {
+          const metricsRef = db.collection('Metrics').doc(newzID);
+          const metricsSnap = await metricsRef.get();
+          const metricsData = metricsSnap.data();
+
+          let newViews = 0;
+
+          if(metricsData) {
+            newViews = metricsData.views;
+          }
+
+          newViews += 1;
+          await metricsRef.set({views: newViews || 0});
+
+          response.status(200).send({
+            data: {
+              status: 'success', 
+              newViews: newViews
+            }
+          });
+        } else {
+          console.log('Newz Item not found or not public.')
+          response.status(400).send({
+            data: {
+              status: 'failed',
+              error: 'Newz Item not found or not public.'
+            }
+          });
+        }
+      } else {
+        console.log('newzID not provided in request.')
+        response.status(400).send({
+          data: {
+            status: 'failed',
+            error: 'newzID not provided in request.'
+          }
+        });
+      }
+    } catch (error) {
+      console.log('Error:', error)
+      response.status(400).send({
+        data: {
+          status: 'failed',
+          error: error
+        }
+      });
+    }
+  });
 });
 
 // Number of Stations
