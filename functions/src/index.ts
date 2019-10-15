@@ -716,4 +716,8 @@ export const collaboratorAdded = functions.firestore.document('Stations/{userID}
   } catch(err) {
     console.log('err', err);
   }
-})
+});
+
+export const inviteContributor = functions.firestore.document(
+  //To do: Cloud function for inviting contributor
+);
