@@ -16,14 +16,14 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 const db = admin.firestore();
 
 export const setupNewUser = functions.auth.user().onCreate(async user => {
-  // const userRef =        db.collection('UserInfo').doc(user.uid);
+  const userRef =        db.collection('UserInfo').doc(user.uid);
   const stationsRef =    db.collection('Stations').doc(user.uid);
   const newzerStatsRef = db.collection('NewzerStats').doc(user.uid);
   try {
-    // const userSnapshot = await userRef.get();
-    // if (userSnapshot.exists) {
-    //   console.log(`The user ${user.uid} already exists. Do Nothing.`);
-    // } else {
+    const userSnapshot = await userRef.get();
+    if (userSnapshot.exists) {
+      console.log(`The user ${user.uid} already exists. Do Nothing.`);
+    } else {
       console.log(`The user ${user.uid} does not exist, let's create it in firestore`);
       console.log(user);
       // let firstName = "";
@@ -33,18 +33,18 @@ export const setupNewUser = functions.auth.user().onCreate(async user => {
       //   firstName = nameArr[0];
       //   lastName = nameArr[1];
       // }
-      // await userRef.set({
+      await userRef.set({
       //   uid: user.uid,
       //   email: user.email || "",
       //   city: "",
       //   country: "",
       //   dob: "",
-      //   imageURL: user.photoURL ? user.photoURL : "",
+        imageURL: user.photoURL ? user.photoURL : "",
       //   firstName: firstName,
       //   lastName: lastName,
-      //   phone: user.phoneNumber ? user.phoneNumber : "",
+        phone: user.phoneNumber ? user.phoneNumber : "",
       //   state: ""
-      // });
+      });
       
     const newStationDoc = stationsRef.collection('MyStations').doc();
     await newStationDoc.set({
