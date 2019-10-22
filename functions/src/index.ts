@@ -16,62 +16,62 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 const db = admin.firestore();
 
 export const setupNewUser = functions.auth.user().onCreate(async user => {
-  const userRef =        db.collection('UserInfo').doc(user.uid);
+  // const userRef =        db.collection('UserInfo').doc(user.uid);
   const stationsRef =    db.collection('Stations').doc(user.uid);
   const newzerStatsRef = db.collection('NewzerStats').doc(user.uid);
   try {
-    const userSnapshot = await userRef.get();
-    if (userSnapshot.exists) {
-      console.log(`The user ${user.uid} already exists. Do Nothing.`);
-    } else {
+    // const userSnapshot = await userRef.get();
+    // if (userSnapshot.exists) {
+    //   console.log(`The user ${user.uid} already exists. Do Nothing.`);
+    // } else {
       console.log(`The user ${user.uid} does not exist, let's create it in firestore`);
       console.log(user);
-      let firstName = "";
-      let lastName = "";
-      if (user.displayName && user.displayName.length > 0) {
-        const nameArr = user.displayName.split(' ');
-        firstName = nameArr[0];
-        lastName = nameArr[1];
-      }
-      await userRef.set({
-        uid: user.uid,
-        email: user.email || "",
-        city: "",
-        country: "",
-        dob: "",
-        imageURL: user.photoURL ? user.photoURL : "",
-        firstName: firstName,
-        lastName: lastName,
-        phone: user.phoneNumber ? user.phoneNumber : "",
-        state: ""
-      });
+      // let firstName = "";
+      // let lastName = "";
+      // if (user.displayName && user.displayName.length > 0) {
+      //   const nameArr = user.displayName.split(' ');
+      //   firstName = nameArr[0];
+      //   lastName = nameArr[1];
+      // }
+      // await userRef.set({
+      //   uid: user.uid,
+      //   email: user.email || "",
+      //   city: "",
+      //   country: "",
+      //   dob: "",
+      //   imageURL: user.photoURL ? user.photoURL : "",
+      //   firstName: firstName,
+      //   lastName: lastName,
+      //   phone: user.phoneNumber ? user.phoneNumber : "",
+      //   state: ""
+      // });
       
-      const newStationDoc = stationsRef.collection('MyStations').doc();
-      await newStationDoc.set({
-        coverPhotoURL: "",
-        createDate: admin.firestore.FieldValue.serverTimestamp(),
-        description: `PocketNewz Default Station`,
-        id: newStationDoc.id,
-        isCollaboration: false,
-        isPublic: true,
-        location: '',
-        ownerID: user.uid,
-        title: user.displayName ? `${user.displayName}'s Station` : `${user.email}'s Station`
-      })
+    const newStationDoc = stationsRef.collection('MyStations').doc();
+    await newStationDoc.set({
+      coverPhotoURL: "",
+      createDate: admin.firestore.FieldValue.serverTimestamp(),
+      description: `PocketNewz Default Station`,
+      id: newStationDoc.id,
+      isCollaboration: false,
+      isPublic: true,
+      location: '',
+      ownerID: user.uid,
+      title: user.displayName ? `${user.displayName}'s Station` : `${user.email}'s Station`
+    })
 
-      const stationRefRef = db.collection('StationRef').doc(newStationDoc.id);
-      await stationRefRef.set({
-        isPublic: true,
-        key: `Stations/${user.uid}/MyStations/${newStationDoc.id}`,
-        newzCount: 0
-      })
+    const stationRefRef = db.collection('StationRef').doc(newStationDoc.id);
+    await stationRefRef.set({
+      isPublic: true,
+      key: `Stations/${user.uid}/MyStations/${newStationDoc.id}`,
+      newzCount: 0
+    })
 
-      await newzerStatsRef.set({
-        followers: 0,
-        newzCount: 0,
-        stations: 1
-      })
-    }
+    await newzerStatsRef.set({
+      followers: 0,
+      newzCount: 0,
+      stations: 1
+    })
+    // }
   } catch(err) {
     console.log(`There was an error requesting the user snapshot`);
   }
@@ -337,61 +337,61 @@ export const newzRating = functions.https.onCall(async (data, context) => {
   }
 });
 
-export const newzShared = functions.https.onCall(async (data, context) => {
-  try {
-    if (context && context.auth) {
-      var uid = context.auth.uid; // user that is doing the rating
-      let newzID = data.newzID; // newz to be rated
+// export const newzShared = functions.https.onCall(async (data, context) => {
+//   try {
+//     if (context && context.auth) {
+//       var uid = context.auth.uid; // user that is doing the rating
+//       let newzID = data.newzID; // newz to be rated
       
-      // Checking attributes.
-      if (!newzID || newzID.length === 0) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
-            'one argument "newzID".');
-      }
-      // Checking that the user is authenticated.
-      if (!context.auth) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
-      }
+//       // Checking attributes.
+//       if (!newzID || newzID.length === 0) {
+//         // Throwing an HttpsError so that the client gets the error details.
+//         throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+//             'one argument "newzID".');
+//       }
+//       // Checking that the user is authenticated.
+//       if (!context.auth) {
+//         // Throwing an HttpsError so that the client gets the error details.
+//         throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+//             'while authenticated.');
+//       }
 
-      const ratingsRef = db.collection('Ratings').doc(newzID);
-      const myRatingsRef = ratingsRef.collection('MyRatings');
+//       const ratingsRef = db.collection('Ratings').doc(newzID);
+//       const myRatingsRef = ratingsRef.collection('MyRatings');
 
-      await myRatingsRef.doc(uid).set({myRating: rating});
+//       await myRatingsRef.doc(uid).set({myRating: rating});
 
-      let counter = 0;
-      let totalRating = 0;
+//       let counter = 0;
+//       let totalRating = 0;
 
-      const avgRatingRef = ratingsRef.collection('AvgRating').doc(newzID);
-      const allRatingsSnap = await myRatingsRef.get();
+//       const avgRatingRef = ratingsRef.collection('AvgRating').doc(newzID);
+//       const allRatingsSnap = await myRatingsRef.get();
 
-      allRatingsSnap.forEach((documentSnapshot) => {
-        let doc = documentSnapshot.data();
-        counter = counter + 1;
-        totalRating = totalRating + doc.myRating;
-      })
+//       allRatingsSnap.forEach((documentSnapshot) => {
+//         let doc = documentSnapshot.data();
+//         counter = counter + 1;
+//         totalRating = totalRating + doc.myRating;
+//       })
 
-      const newAvg = totalRating / counter;
-      await avgRatingRef.set({avgRating: newAvg});
+//       const newAvg = totalRating / counter;
+//       await avgRatingRef.set({avgRating: newAvg});
 
-      // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
+//       // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
 
-      const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
-      await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
+//       const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
+//       await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
 
-      return { status: 'success', avgRating: newAvg };
-    } else {
-      console.log('failed - no context or context.auth', context)
-      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
-    }
-  } catch (error) {
-    console.log('failed', error)
-    throw new functions.https.HttpsError('internal', error);
-  }
-});
+//       return { status: 'success', avgRating: newAvg };
+//     } else {
+//       console.log('failed - no context or context.auth', context)
+//       throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+//             'while authenticated.');
+//     }
+//   } catch (error) {
+//     console.log('failed', error)
+//     throw new functions.https.HttpsError('internal', error);
+//   }
+// });
 
 // Follow Newzer
 // Only need the ID of user to follow. The follower is the user that is sending the request
@@ -717,3 +717,61 @@ export const collaboratorAdded = functions.firestore.document('Stations/{userID}
     console.log('err', err);
   }
 })
+
+export const inviteContributor = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is doing the rating
+      let contributorID = data.uid; // newz to be rated
+      let stationID = data.stationID; // rating score
+
+      console.log('IDs and rating: ', uid, contributorID, stationID)
+
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called while authenticated.');
+      }
+
+      // Checking attributes.
+      if ( (!contributorID || !contributorID.length) || (!stationID || !stationID.length) ) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with two arguments "contributorID" and "stationID".');
+      }
+
+      const stationRef = db.collection('Stations').doc(`${uid}/MyStations/${stationID}`);
+      const stationSnapshot = await stationRef.get();
+      const stationData = stationSnapshot.data();
+
+      if (stationSnapshot.exists && stationData) {
+        const contributorStationRef = db.collection('Stations').doc(`${contributorID}/Collaborating/${stationID}`);
+        const contributorStationSnapshot = await contributorStationRef.get();
+
+        if (contributorStationSnapshot.exists) {
+          console.log('contributorStationSnapshot exists', contributorStationSnapshot.data())
+          return {status: 'already-exists', message: 'User is already a contributor to this station.'}
+        } else {
+          console.log('contributorStationSnapshot doesnt exist', contributorStationSnapshot.data())
+          // add them as a contrib
+          const stationPath = `Stations/${contributorID}/Collaborating/${stationID}`;
+          await contributorStationRef.set({
+            createdDate: admin.firestore.Timestamp.now(),
+            id: stationData.id, 
+            stationRef: stationPath,
+            ownerID: stationData.ownerID
+          })
+
+          return { status: 'success', contributorStationRef: stationPath};
+        }
+      } else {
+        throw new functions.https.HttpsError('internal', 'Station does not exist for user.');
+      }      
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called while authenticated.');
+    }
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
+});
