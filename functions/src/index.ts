@@ -20,12 +20,12 @@ export const setupNewUser = functions.auth.user().onCreate(async user => {
   const stationsRef =    db.collection('Stations').doc(user.uid);
   const newzerStatsRef = db.collection('NewzerStats').doc(user.uid);
   try {
-    const userSnapshot = await userRef.get();
-    if (userSnapshot.exists) {
-      console.log(`The user ${user.uid} already exists. Do Nothing.`);
-    } else {
-      console.log(`The user ${user.uid} does not exist, let's create it in firestore`);
-      console.log(user);
+    // const userSnapshot = await userRef.get();
+    // if (userSnapshot.exists) {
+    //   console.log(`The user ${user.uid} already exists. Do Nothing.`);
+    // } else {
+      // console.log(`The user ${user.uid} does not exist, let's create it in firestore`);
+      // console.log(user);
       // let firstName = "";
       // let lastName = "";
       // if (user.displayName && user.displayName.length > 0) {
@@ -33,19 +33,23 @@ export const setupNewUser = functions.auth.user().onCreate(async user => {
       //   firstName = nameArr[0];
       //   lastName = nameArr[1];
       // }
-      await userRef.set({
-      //   uid: user.uid,
-      //   email: user.email || "",
-      //   city: "",
-      //   country: "",
-      //   dob: "",
-        imageURL: user.photoURL ? user.photoURL : "",
-      //   firstName: firstName,
-      //   lastName: lastName,
-        phone: user.phoneNumber ? user.phoneNumber : "",
-      //   state: ""
-      });
-      
+    
+    // }
+
+    // let firstName = "";
+    // let lastName = "";
+    // if (user.displayName && user.displayName.length > 0) {
+    //   const nameArr = user.displayName.split(' ');
+    //   firstName = nameArr[0];
+    //   lastName = nameArr[1];
+    // }
+    
+    await userRef.set({
+      // firstName: 
+      imageURL: user.photoURL ? user.photoURL : "",
+      phone: user.phoneNumber ? user.phoneNumber : ""
+    });
+    
     const newStationDoc = stationsRef.collection('MyStations').doc();
     await newStationDoc.set({
       coverPhotoURL: "",
