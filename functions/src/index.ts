@@ -162,7 +162,7 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
         } else {
           const stationInfo = stationRef.data();
           if (stationInfo) {
-            const newCount = stationInfo.newzCount + 1;
+            const newCount = (stationInfo.newzCount || 0) + 1;
             await db.collection('StationRef').doc(stationID).update({
               newzCount: newCount
             })
@@ -176,30 +176,6 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
       await metricsRef.set({
         views: 0
       })
-
-      if(newzItem.ownerID !== newzItem.posterID) {
-        const newzPosterRef = db.collection('UserInfo').doc(newzItem.posterID);
-        const newzPosterSnap = await newzPosterRef.get();
-        const newzPosterData = newzPosterSnap.data();
-        
-        if(newzPosterData) {
-          const msg = {
-            to: newzPosterData.email,
-            from: 'noreply@pocketnewz.com',
-            subject: 'Pocket Newz - Successfully Contributed',
-            // custom templates
-            templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
-            substitutionWrappers: ['{{', '}}'],
-            substitutions: {
-              name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
-              title: newzItem.title
-            }
-          };
-
-          sgMail.send(msg)
-          console.log(`Email Sent to ${newzPosterData.email}!`)
-        }
-      }
     } else {
       console.log('There was no newzItem');
     }
@@ -611,30 +587,26 @@ export const viewSharedNewz = functions.https.onRequest((request, response) => {
 });
 
 // Number of Stations
-export const onStationCreated = functions.firestore.document('Stations/{stationID}').onCreate(async (snap, context) => {
+export const onStationCreated = functions.firestore.document('Stations/{ownerID}/MyStations/{stationID}').onCreate(async (snap, context) => {
   try {
+    const ownerID = context.params.ownerID;
+    const stationID = context.params.stationID;
     const stationRef = snap.data();
-    if (stationRef) {
-      const stationKey = stationRef.key;
-      if (stationKey) {
-        const stationKeyArr = stationKey.split('/');
-        const ownerID = stationKeyArr[1];
-        const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
-        if (!newzerStats.exists) {
-          console.log(`the document ${ownerID} does not exist`);
-        } else {
-          const newzerStatsData = newzerStats.data();
-          if (newzerStatsData) {
-            const newCount = newzerStatsData.stations + 1;
-            await db.collection('NewzerStats').doc(ownerID).update({
-              stations: newCount
-            })
-          } else {
-            console.log(`There is no info for NewzerStats/${ownerID}`);
-          }
-        }
+
+    if (stationRef && ownerID && stationID) {
+      const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
+      if (!newzerStats.exists) {
+        console.log(`the document ${ownerID} does not exist`);
       } else {
-        console.log('There was no StationKey');
+        const newzerStatsData = newzerStats.data();
+        if (newzerStatsData) {
+          const newCount = newzerStatsData.stations + 1;
+          await db.collection('NewzerStats').doc(ownerID).update({
+            stations: newCount
+          })
+        } else {
+          console.log(`There is no info for NewzerStats/${ownerID}`);
+        }
       }
     } else {
       console.log('There was no StationRef');
@@ -779,3 +751,96 @@ export const inviteContributor = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('internal', error);
   }
 });
+
+export const onStationFollowing = functions.firestore.document('Station/{userID}/Following/{stationID}').onCreate(async (snap, context) => {
+  try {
+    const stationRef = snap.data();
+    if (stationRef) {
+      const stationID = context.params.stationID
+      if (stationID) {
+        const stationRef = db.collection('StationRef').doc(stationID)
+        const stationSnapshot = await stationRef.get();
+
+        if (!stationSnapshot.exists) {
+          console.log(`the StationRef ${stationID} does not exist`);
+        } else {          
+          const stationData = stationSnapshot.data();
+
+          if (stationData) {
+            const newCount = (stationData.following || 0) + 1;
+            await stationRef.update({
+              following: newCount
+            })
+          } else {
+            console.log(`There is no info for Stationref/${stationID}`);
+          }
+        }
+      } else {
+        console.log('There was no StationKey');
+      }
+    } else {
+      console.log('There was no StationRef');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+});
+
+export const onStationUnfollowing = functions.firestore.document('Station/{userID}/Following/{stationID}').onDelete(async (snap, context) => {
+  try {
+    const stationRef = snap.data();
+    if (stationRef) {
+      const stationID = context.params.stationID
+      if (stationID) {
+        const stationRef = db.collection('StationRef').doc(stationID)
+        const stationSnapshot = await stationRef.get();
+
+        if (!stationSnapshot.exists) {
+          console.log(`the StationRef ${stationID} does not exist`);
+        } else {          
+          const stationData = stationSnapshot.data();
+
+          if (stationData) {
+            const newCount = stationData.following - 1;
+            await stationRef.update({
+              following: newCount >= 0 ? newCount : 0
+            })
+          } else {
+            console.log(`There is no info for Stationref/${stationID}`);
+          }
+        }
+      } else {
+        console.log('There was no StationKey');
+      }
+    } else {
+      console.log('There was no StationRef');
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+});
+
+
+// if(newzItem.ownerID !== newzItem.posterID) {
+//   const newzPosterRef = db.collection('UserInfo').doc(newzItem.posterID);
+//   const newzPosterSnap = await newzPosterRef.get();
+//   const newzPosterData = newzPosterSnap.data();
+  
+//   if(newzPosterData) {
+//     const msg = {
+//       to: newzPosterData.email,
+//       from: 'noreply@pocketnewz.com',
+//       subject: 'Pocket Newz - Successfully Contributed',
+//       // custom templates
+//       templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
+//       substitutionWrappers: ['{{', '}}'],
+//       substitutions: {
+//         name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
+//         title: newzItem.title
+//       }
+//     };
+
+//     sgMail.send(msg)
+//     console.log(`Email Sent to ${newzPosterData.email}!`)
+//   }
+// }
