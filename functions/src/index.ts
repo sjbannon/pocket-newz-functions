@@ -44,7 +44,7 @@ export const setupNewUser = functions.auth.user().onCreate(async user => {
     //   lastName = nameArr[1];
     // }
     
-    await userRef.set({
+    await userRef.update({
       // firstName: 
       imageURL: user.photoURL ? user.photoURL : "",
       phone: user.phoneNumber ? user.phoneNumber : ""
