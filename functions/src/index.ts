@@ -779,3 +779,8 @@ export const inviteContributor = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('internal', error);
   }
 });
+
+export const requestContentProviderAuth = functions.https.onCall(async (data, context) => {
+  console.log('TEST');
+  return 'requestContentProviderAuth TEST';
+})
