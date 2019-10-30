@@ -946,3 +946,52 @@ export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}')
     console.log('err', err);
   }
 });
+export const requestContentProviderAuth = functions.https.onCall(async (data, context) => {
+  console.log('TEST');
+
+  // Checking that the user is authenticated.
+  if (!context.auth) {
+    // Throwing an HttpsError so that the client gets the error details.
+    throw new functions.https.HttpsError('failed-precondition', 'The function must be called while authenticated.');
+  }
+  
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is requesting to post newz
+
+      if(uid) {
+        const userRef = db.collection('UserInfo').doc(uid);
+        const userSnap = await userRef.get();
+        const user = userSnap.data();
+
+        if(user) {
+          const msg = {
+            to: 'customerservice@pocketnewz.com',
+            from: '<noreply@pocketnewz.com>',
+            reply_to: user.email,
+            subject: 'Pocket Newz - User Authentication Request',
+            templateId: 'd-64d144b65b0b488aa38c503d86053638',
+            dynamic_template_data: {
+              email: user.email,
+              userName: `${user.firstName} ${user.lastName}`
+            }
+          };
+    
+          sgMail.send(msg)
+          console.log("Email Sent to customerservice@pocketnewz.com")
+
+          return {status: 'success'}; 
+        } else {
+          throw new functions.https.HttpsError('not-found', 'The function could not retrieve the user data: '+uid);
+        }
+      } else {
+        throw new functions.https.HttpsError('not-found', 'The function did not retrieve the UID');
+      }
+    } else {
+      throw new functions.https.HttpsError('not-found', 'The function did not receive auth');
+    }
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
+})
