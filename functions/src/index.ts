@@ -878,66 +878,65 @@ export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}')
 
       //TODO check if new stations are public. If any public then we send email
       
-      // if(afterData.ownerID != afterData.posterID) {
-        // for after testing
-      // }
-      const beforeStations = beforeData.stationIDs;
-      const afterStations = afterData.stationIDs;
+      if(afterData.ownerID != afterData.posterID) {        
+        const beforeStations = beforeData.stationIDs;
+        const afterStations = afterData.stationIDs;
 
-      if(beforeStations.sort() != afterStations.sort()) {
-        let stationNames: string[] = [];
-        let stationRefRef;
-        let stationRefSnapshot;
-        let stationRefData;
-        let stationRef;
-        let stationSnapshot;
-        let stationData;
-        let stationID;
+        if(beforeStations.sort() != afterStations.sort()) {
+          let stationNames: string[] = [];
+          let stationRefRef;
+          let stationRefSnapshot;
+          let stationRefData;
+          let stationRef;
+          let stationSnapshot;
+          let stationData;
+          let stationID;
 
-        console.log('afterStations', afterStations)
+          console.log('afterStations', afterStations)
 
-        for (var i = 0; i < afterStations.length; i++) {
-          stationID = afterStations[i];
-          console.log('stationID', stationID)
-          stationRefRef = db.collection('StationRef').doc(stationID)
-          stationRefSnapshot = await stationRefRef.get();
-          stationRefData = stationRefSnapshot.data();
-          console.log('stationRefData', stationRefData)
-          if(stationRefData && stationRefData.isPublic) {
-            stationRef = db.doc(stationRefData.key);
-            stationSnapshot = await stationRef.get();
-            stationData = stationSnapshot.data();
-            console.log('stationData', stationData)
-            if(stationData) {
-              stationNames.push(stationData.title);
-            }            
-          }          
-        }
+          for (var i = 0; i < afterStations.length; i++) {
+            stationID = afterStations[i];
+            console.log('stationID', stationID)
+            stationRefRef = db.collection('StationRef').doc(stationID)
+            stationRefSnapshot = await stationRefRef.get();
+            stationRefData = stationRefSnapshot.data();
+            console.log('stationRefData', stationRefData)
+            if(stationRefData && stationRefData.isPublic) {
+              stationRef = db.doc(stationRefData.key);
+              stationSnapshot = await stationRef.get();
+              stationData = stationSnapshot.data();
+              console.log('stationData', stationData)
+              if(stationData) {
+                stationNames.push(stationData.title);
+              }            
+            }          
+          }
 
-        console.log('stationNames', stationNames)
+          console.log('stationNames', stationNames)
 
-        if(stationNames.length) {
-          const newzPosterRef = db.collection('UserInfo').doc(afterData.posterID);
-          const newzPosterSnap = await newzPosterRef.get();
-          const newzPosterData = newzPosterSnap.data();
-          console.log('newzPosterData', newzPosterData)
-          if(newzPosterData) {
-            const msg = {
-              to: newzPosterData.email,
-              from: 'noreply@pocketnewz.com',
-              subject: 'Pocket Newz - Successfully Contributed',
-              // custom templates
-              templateId: 'd-d27b91bf1de242a6ba7bac8e4f2f5b9e',
-              // substitutionWrappers: ['{{', '}}'],
-              dynamic_template_data: {
-                name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
-                title: afterData.title,
-                stationNames: stationNames.join(', ')
-              }
-            };
+          if(stationNames.length) {
+            const newzPosterRef = db.collection('UserInfo').doc(afterData.posterID);
+            const newzPosterSnap = await newzPosterRef.get();
+            const newzPosterData = newzPosterSnap.data();
+            console.log('newzPosterData', newzPosterData)
+            if(newzPosterData) {
+              const msg = {
+                to: newzPosterData.email,
+                from: 'noreply@pocketnewz.com',
+                subject: 'Pocket Newz - Successfully Contributed',
+                // custom templates
+                templateId: 'd-d27b91bf1de242a6ba7bac8e4f2f5b9e',
+                // substitutionWrappers: ['{{', '}}'],
+                dynamic_template_data: {
+                  name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
+                  title: afterData.title,
+                  stationNames: stationNames.join(', ')
+                }
+              };
 
-            sgMail.send(msg)
-            console.log(`Email Sent to ${newzPosterData.email}!`)
+              sgMail.send(msg)
+              console.log(`Email Sent to ${newzPosterData.email}!`)
+            }
           }
         }
       }
