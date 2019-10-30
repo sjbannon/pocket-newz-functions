@@ -454,6 +454,51 @@ export const followNewzer = functions.https.onCall(async (data, context) => {
   }
 });
 
+// Share newz. Called when sharing a newz story.
+export const shareNewz = functions.https.onCall(async (data, context) => {
+  try {
+    if (context && context.auth) {
+      var uid = context.auth.uid; // user that is doing the rating
+      let newzID = data.newzID; // newz to be rated
+
+      console.log('IDs and rating: ', uid, newzID)
+
+      // Checking attributes.
+      if (!newzID || newzID.length === 0) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
+            'one argument "newzID".');
+      }
+      // Checking that the user is authenticated.
+      if (!context.auth) {
+        // Throwing an HttpsError so that the client gets the error details.
+        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+      }
+
+      const metricsRef = db.collection('Metrics').doc(newzID);
+      const metricsSnap = await metricsRef.get();
+      const metricsData = metricsSnap.data();
+
+      if(metricsData) {
+        let newzShares = (metricsData.shares || 0) + 1;
+        await metricsRef.set({shares: newzShares || 0},{merge: true});
+
+        return { status: 'success', newzShares: newzShares };
+      } else {
+        throw new functions.https.HttpsError('not-found', 'The function could not retrieve the metrics data for newz with ID: '+newzID);
+      }
+    } else {
+      console.log('failed - no context or context.auth', context)
+      throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
+            'while authenticated.');
+    }
+  } catch (error) {
+    console.log('failed', error)
+    throw new functions.https.HttpsError('internal', error);
+  }
+});
+
 // View Newz
 // requires newzID
 export const viewNewz = functions.https.onCall(async (data, context) => {
@@ -590,22 +635,24 @@ export const viewSharedNewz = functions.https.onRequest((request, response) => {
 export const onStationCreated = functions.firestore.document('Stations/{ownerID}/MyStations/{stationID}').onCreate(async (snap, context) => {
   try {
     const ownerID = context.params.ownerID;
-    const stationID = context.params.stationID;
     const stationRef = snap.data();
 
-    if (stationRef && ownerID && stationID) {
-      const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
-      if (!newzerStats.exists) {
-        console.log(`the document ${ownerID} does not exist`);
+    if (stationRef && ownerID) {
+      const newzerStatsRef = db.collection('NewzerStats').doc(ownerID);
+      const newzerStatsSnap = await newzerStatsRef.get();
+
+      if (!newzerStatsSnap.exists) {
+        console.log(`the NewzerStats for ${ownerID} does not exist`);
       } else {
-        const newzerStatsData = newzerStats.data();
+        const newzerStatsData = newzerStatsSnap.data();
+
         if (newzerStatsData) {
-          const newCount = newzerStatsData.stations + 1;
-          await db.collection('NewzerStats').doc(ownerID).update({
+          const newCount = (newzerStatsData.stations || 0) + 1;
+          await newzerStatsRef.update({
             stations: newCount
           })
         } else {
-          console.log(`There is no info for NewzerStats/${ownerID}`);
+          console.log(`There is no data for NewzerStats/${ownerID}`);
         }
       }
     } else {
@@ -616,30 +663,28 @@ export const onStationCreated = functions.firestore.document('Stations/{ownerID}
   }
 });
 
-export const onStationDestroyed = functions.firestore.document('StationRef/{stationID}').onDelete(async (snap, context) => {
+export const onStationDestroyed = functions.firestore.document('Stations/{ownerID}/MyStations/{stationID}').onDelete(async (snap, context) => {
   try {
+    const ownerID = context.params.ownerID;
     const stationRef = snap.data();
-    if (stationRef) {
-      const stationKey = stationRef.key;
-      if (stationKey) {
-        const stationKeyArr = stationKey.split('/');
-        const ownerID = stationKeyArr[1];
-        const newzerStats = await db.collection('NewzerStats').doc(ownerID).get();
-        if (!newzerStats.exists) {
-          console.log(`the document ${ownerID} does not exist`);
-        } else {
-          const newzerStatsData = newzerStats.data();
-          if (newzerStatsData) {
-            const newCount = newzerStatsData.stations - 1;
-            await db.collection('NewzerStats').doc(ownerID).update({
-              stations: newCount < 0 ? 0 : newCount
-            })
-          } else {
-            console.log(`There is no info for NewzerStats/${ownerID}`);
-          }
-        }
+
+    if (stationRef && ownerID) {
+      const newzerStatsRef = db.collection('NewzerStats').doc(ownerID);
+      const newzerStatsSnap = await newzerStatsRef.get();
+
+      if (!newzerStatsSnap.exists) {
+        console.log(`the NewzerStats for ${ownerID} does not exist`);
       } else {
-        console.log('There was no StationKey');
+        const newzerStatsData = newzerStatsSnap.data();
+
+        if (newzerStatsData) {
+          const newCount = newzerStatsData.stations - 1;
+          await newzerStatsRef.update({
+            stations: newCount > 0 ? newCount : 0
+          })
+        } else {
+          console.log(`There is no data for NewzerStats/${ownerID}`);
+        }
       }
     } else {
       console.log('There was no StationRef');
@@ -675,8 +720,8 @@ export const collaboratorAdded = functions.firestore.document('Stations/{userID}
           subject: 'Pocket Newz - Added as Contributor',
           // custom templates
           templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
-          substitutionWrappers: ['{{', '}}'],
-          substitutions: {
+          // substitutionWrappers: ['{{', '}}'],
+          dynamicTemplateData: {
             contributorName: `${user.firstName} ${user.lastName}`,
             stationUsername: `${stationOwnerData.firstName} ${stationOwnerData.lastName}`,
             stationName: stationData.title,
@@ -752,14 +797,14 @@ export const inviteContributor = functions.https.onCall(async (data, context) =>
   }
 });
 
-export const onStationFollowing = functions.firestore.document('Station/{userID}/Following/{stationID}').onCreate(async (snap, context) => {
+export const onStationFollowing = functions.firestore.document('Stations/{userID}/Following/{stationID}').onCreate(async (snap, context) => {
   try {
     const stationRef = snap.data();
     if (stationRef) {
       const stationID = context.params.stationID
       if (stationID) {
-        const stationRef = db.collection('StationRef').doc(stationID)
-        const stationSnapshot = await stationRef.get();
+        const stationRefRef = db.collection('StationRef').doc(stationID)
+        const stationSnapshot = await stationRefRef.get();
 
         if (!stationSnapshot.exists) {
           console.log(`the StationRef ${stationID} does not exist`);
@@ -768,7 +813,7 @@ export const onStationFollowing = functions.firestore.document('Station/{userID}
 
           if (stationData) {
             const newCount = (stationData.following || 0) + 1;
-            await stationRef.update({
+            await stationRefRef.update({
               following: newCount
             })
           } else {
@@ -786,14 +831,14 @@ export const onStationFollowing = functions.firestore.document('Station/{userID}
   }
 });
 
-export const onStationUnfollowing = functions.firestore.document('Station/{userID}/Following/{stationID}').onDelete(async (snap, context) => {
+export const onStationUnfollowing = functions.firestore.document('Stations/{userID}/Following/{stationID}').onDelete(async (snap, context) => {
   try {
     const stationRef = snap.data();
     if (stationRef) {
       const stationID = context.params.stationID
       if (stationID) {
-        const stationRef = db.collection('StationRef').doc(stationID)
-        const stationSnapshot = await stationRef.get();
+        const stationRefRef = db.collection('StationRef').doc(stationID)
+        const stationSnapshot = await stationRefRef.get();
 
         if (!stationSnapshot.exists) {
           console.log(`the StationRef ${stationID} does not exist`);
@@ -802,7 +847,7 @@ export const onStationUnfollowing = functions.firestore.document('Station/{userI
 
           if (stationData) {
             const newCount = stationData.following - 1;
-            await stationRef.update({
+            await stationRefRef.update({
               following: newCount >= 0 ? newCount : 0
             })
           } else {
@@ -820,27 +865,84 @@ export const onStationUnfollowing = functions.firestore.document('Station/{userI
   }
 });
 
+// Watcher for when a newz item that was posted to a collab station is posted by the owner of that collab station
+export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}').onUpdate(async (change, context) => {
+  try {
+    const beforeData = change.before.data(); // data before the write
+    const afterData = change.after.data();
 
-// if(newzItem.ownerID !== newzItem.posterID) {
-//   const newzPosterRef = db.collection('UserInfo').doc(newzItem.posterID);
-//   const newzPosterSnap = await newzPosterRef.get();
-//   const newzPosterData = newzPosterSnap.data();
-  
-//   if(newzPosterData) {
-//     const msg = {
-//       to: newzPosterData.email,
-//       from: 'noreply@pocketnewz.com',
-//       subject: 'Pocket Newz - Successfully Contributed',
-//       // custom templates
-//       templateId: 'd-83de01c6f1d04cd99ee4b9ac25a92013',
-//       substitutionWrappers: ['{{', '}}'],
-//       substitutions: {
-//         name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
-//         title: newzItem.title
-//       }
-//     };
+    console.log('beforeData: ', beforeData);
+    console.log('afterData: ', afterData);
 
-//     sgMail.send(msg)
-//     console.log(`Email Sent to ${newzPosterData.email}!`)
-//   }
-// }
+    if(afterData && beforeData) {
+
+      //TODO check if new stations are public. If any public then we send email
+      
+      // if(afterData.ownerID != afterData.posterID) {
+        // for after testing
+      // }
+      const beforeStations = beforeData.stationIDs;
+      const afterStations = afterData.stationIDs;
+
+      if(beforeStations.sort() != afterStations.sort()) {
+        let stationNames: string[] = [];
+        let stationRefRef;
+        let stationRefSnapshot;
+        let stationRefData;
+        let stationRef;
+        let stationSnapshot;
+        let stationData;
+        let stationID;
+
+        console.log('afterStations', afterStations)
+
+        for (var i = 0; i < afterStations.length; i++) {
+          stationID = afterStations[i];
+          console.log('stationID', stationID)
+          stationRefRef = db.collection('StationRef').doc(stationID)
+          stationRefSnapshot = await stationRefRef.get();
+          stationRefData = stationRefSnapshot.data();
+          console.log('stationRefData', stationRefData)
+          if(stationRefData && stationRefData.isPublic) {
+            stationRef = db.doc(stationRefData.key);
+            stationSnapshot = await stationRef.get();
+            stationData = stationSnapshot.data();
+            console.log('stationData', stationData)
+            if(stationData) {
+              stationNames.push(stationData.title);
+            }            
+          }          
+        }
+
+        console.log('stationNames', stationNames)
+
+        if(stationNames.length) {
+          const newzPosterRef = db.collection('UserInfo').doc(afterData.posterID);
+          const newzPosterSnap = await newzPosterRef.get();
+          const newzPosterData = newzPosterSnap.data();
+          console.log('newzPosterData', newzPosterData)
+          if(newzPosterData) {
+            const msg = {
+              to: newzPosterData.email,
+              from: 'noreply@pocketnewz.com',
+              subject: 'Pocket Newz - Successfully Contributed',
+              // custom templates
+              templateId: 'd-d27b91bf1de242a6ba7bac8e4f2f5b9e',
+              // substitutionWrappers: ['{{', '}}'],
+              dynamic_template_data: {
+                name: `${newzPosterData.firstName} ${newzPosterData.lastName}`,
+                title: afterData.title,
+                stationNames: stationNames.join(', ')
+              }
+            };
+
+            sgMail.send(msg)
+            console.log(`Email Sent to ${newzPosterData.email}!`)
+          }
+        }
+      }
+    }
+  } catch(err) {
+    console.log('err', err);
+  }
+});
