@@ -876,11 +876,23 @@ export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}')
 
       //TODO check if new stations are public. If any public then we send email
       
-      if(afterData.ownerID != afterData.posterID) {        
+      if(afterData.ownerID !== afterData.posterID) {        
         const beforeStations = beforeData.stationIDs;
         const afterStations = afterData.stationIDs;
 
-        if(beforeStations.sort() != afterStations.sort()) {
+        for (const tagStation of afterData.tagStations) {
+          db.collection('StationRef').doc(tagStation).get().then((doc) => {
+            if (doc.exists) {
+              doc.data()!.newzCount += 1;
+              console.log(`newzCount fo ${tagStation}: `, doc.data()!.newzCount)
+            } else {
+              // if it's undefined:
+              console.log('No document');
+          }
+          }).catch(error => console.log(error));
+        }
+
+        if(beforeStations.sort() !== afterStations.sort()) {
           let stationNames: string[] = [];
           let stationRefRef;
           let stationRefSnapshot;
