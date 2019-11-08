@@ -16,70 +16,67 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 const db = admin.firestore();
 
 export const setupNewUser = functions.auth.user().onCreate(async user => {
-  const userRef =        db.collection('UserInfo').doc(user.uid);
-  const stationsRef =    db.collection('Stations').doc(user.uid);
+  // const userRef =  db.collection('UserInfo').doc(user.uid);
   const newzerStatsRef = db.collection('NewzerStats').doc(user.uid);
   try {
-    // const userSnapshot = await userRef.get();
-    // if (userSnapshot.exists) {
-    //   console.log(`The user ${user.uid} already exists. Do Nothing.`);
-    // } else {
-      // console.log(`The user ${user.uid} does not exist, let's create it in firestore`);
-      // console.log(user);
-      // let firstName = "";
-      // let lastName = "";
-      // if (user.displayName && user.displayName.length > 0) {
-      //   const nameArr = user.displayName.split(' ');
-      //   firstName = nameArr[0];
-      //   lastName = nameArr[1];
-      // }
+    // await userRef.update({
+    //   imageURL: user.photoURL ? user.photoURL : "",
+    //   phone: user.phoneNumber ? user.phoneNumber : ""
+    // });
     
-    // }
-
-    // let firstName = "";
-    // let lastName = "";
-    // if (user.displayName && user.displayName.length > 0) {
-    //   const nameArr = user.displayName.split(' ');
-    //   firstName = nameArr[0];
-    //   lastName = nameArr[1];
-    // }
-    
-    await userRef.update({
-      // firstName: 
-      imageURL: user.photoURL ? user.photoURL : "",
-      phone: user.phoneNumber ? user.phoneNumber : ""
-    });
-    
-    const newStationDoc = stationsRef.collection('MyStations').doc();
-    await newStationDoc.set({
-      coverPhotoURL: "",
-      createDate: admin.firestore.FieldValue.serverTimestamp(),
-      description: `PocketNewz Default Station`,
-      id: newStationDoc.id,
-      isCollaboration: false,
-      isPublic: true,
-      location: '',
-      ownerID: user.uid,
-      title: user.displayName ? `${user.displayName}'s Station` : `${user.email}'s Station`
-    })
-
-    const stationRefRef = db.collection('StationRef').doc(newStationDoc.id);
-    await stationRefRef.set({
-      isPublic: true,
-      key: `Stations/${user.uid}/MyStations/${newStationDoc.id}`,
-      newzCount: 0
-    })
-
     await newzerStatsRef.set({
       followers: 0,
       newzCount: 0,
       stations: 1
     })
-    // }
   } catch(err) {
     console.log(`There was an error requesting the user snapshot`);
   }
 });
+
+export const onUserInfoAdded = functions.firestore.document('UserInfo/{uid}').onCreate(async (snap, context) => {
+  try {
+    const uid = context.params.uid;
+    if(uid) {
+      const stationsRef = db.collection('Stations').doc(context.params.uid);
+      const userInfoData = snap.data();
+
+      if(userInfoData) {
+        let displayName;
+        if (userInfoData.firstName.length > 0) {
+          displayName = `${userInfoData.firstName} ${userInfoData.lastName}`;
+        }
+
+        const newStationDoc = stationsRef.collection('MyStations').doc();
+      
+        await newStationDoc.set({
+          coverPhotoURL: "",
+          createDate: admin.firestore.FieldValue.serverTimestamp(),
+          description: `PocketNewz Default Station`,
+          id: newStationDoc.id,
+          isCollaboration: false,
+          isPublic: true,
+          location: '',
+          ownerID: userInfoData.uid,
+          title: displayName ? `${displayName}'s Station` : `${userInfoData.email}'s Station`
+        })
+
+        const stationRefRef = db.collection('StationRef').doc(newStationDoc.id);
+        await stationRefRef.set({
+          isPublic: true,
+          key: `Stations/${uid}/MyStations/${newStationDoc.id}`,
+          newzCount: 0
+        })
+      } else {
+        console.log('no userInfoData from snapshot')
+      }
+    } else {
+      console.log('No UID')
+    }
+  } catch(err) {
+    console.log(`There was an error requesting the user snapshot`);
+  }
+})
 
 export const cloneNewzAssets = functions.https.onRequest((request, response) => {
   cors(request, response, async () => {
@@ -379,7 +376,8 @@ export const newzRating = functions.https.onCall(async (data, context) => {
 export const followNewzer = functions.https.onCall(async (data, context) => {
   try {
     if (context && context.auth) {
-      let following, followers;
+      let following = [];
+      let followers = 0;
       var followerId = context.auth.uid; // user that is doing the following
       let followId = data.followID; // user being followed
       console.log('IDs', followerId, followId);
@@ -421,7 +419,7 @@ export const followNewzer = functions.https.onCall(async (data, context) => {
         // Checking data is valid.
         if (following === undefined) {
           // Throwing an HttpsError so that the client gets the error details.
-          throw new functions.https.HttpsError('not-found', 'The function could not retrieve the authenticated user with ID: '+followerId);
+          throw new functions.https.HttpsError('not-found', 'The function could not retrieve the current following for user with ID: '+followerId);
         }
         if (followers === undefined) {
           // Throwing an HttpsError so that the client gets the error details.
@@ -774,7 +772,7 @@ export const inviteContributor = functions.https.onCall(async (data, context) =>
         } else {
           console.log('contributorStationSnapshot doesnt exist', contributorStationSnapshot.data())
           // add them as a contrib
-          const stationPath = `Stations/${contributorID}/Collaborating/${stationID}`;
+          const stationPath = `/Stations/${uid}/MyStations/${stationID}`;
           await contributorStationRef.set({
             createdDate: admin.firestore.Timestamp.now(),
             id: stationData.id, 
