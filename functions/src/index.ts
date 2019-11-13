@@ -22,7 +22,7 @@ export const deleteUserInfo = functions.auth.user().onDelete(async user => {
   const NewzViews = db.collection('NewzViews').doc(user.uid);
 
   if(userInfo) {
-    userInfo.delete().then(function() {
+    userInfo.delete().then(() => {
       console.log("UserInfo successfully deleted! UserID: ", user.uid);
     }).catch(function(error) {
       console.error("Error removing document: ", error);
@@ -30,7 +30,7 @@ export const deleteUserInfo = functions.auth.user().onDelete(async user => {
   }
 
   if(Stations) {
-    userInfo.delete().then(function() {
+    Stations.delete().then(() => {
       console.log("Station successfully deleted! UserID: ", user.uid);
     }).catch(function(error) {
       console.error("Error removing document: ", error);
@@ -38,7 +38,7 @@ export const deleteUserInfo = functions.auth.user().onDelete(async user => {
   }
 
   if(RatingsRef) {
-    userInfo.delete().then(function() {
+    RatingsRef.delete().then(() => {
       console.log("RatingsRef successfully deleted! UserID: ", user.uid);
     }).catch(function(error) {
       console.error("Error removing document: ", error);
@@ -46,7 +46,7 @@ export const deleteUserInfo = functions.auth.user().onDelete(async user => {
   }
 
   if(NewzViews) {
-    userInfo.delete().then(function() {
+    NewzViews.delete().then(() => {
       console.log("NewzViews successfully deleted! UserID: ", user.uid);
     }).catch(function(error) {
       console.error("Error removing document: ", error);
