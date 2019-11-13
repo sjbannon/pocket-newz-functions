@@ -15,6 +15,45 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 
 const db = admin.firestore();
 
+export const deleteUserInfo = functions.auth.user().onDelete(async user => {
+  const userInfo = db.collection('UserInfo').doc(user.uid);
+  const Stations = db.collection('Stations').doc(user.uid);
+  const RatingsRef = db.collection('RatingsRef').doc(user.uid);
+  const NewzViews = db.collection('NewzViews').doc(user.uid);
+
+  if(userInfo) {
+    userInfo.delete().then(function() {
+      console.log("UserInfo successfully deleted! UserID: ", user.uid);
+    }).catch(function(error) {
+      console.error("Error removing document: ", error);
+    });
+  }
+
+  if(Stations) {
+    userInfo.delete().then(function() {
+      console.log("Station successfully deleted! UserID: ", user.uid);
+    }).catch(function(error) {
+      console.error("Error removing document: ", error);
+    });
+  }
+
+  if(RatingsRef) {
+    userInfo.delete().then(function() {
+      console.log("RatingsRef successfully deleted! UserID: ", user.uid);
+    }).catch(function(error) {
+      console.error("Error removing document: ", error);
+    });
+  }
+
+  if(NewzViews) {
+    userInfo.delete().then(function() {
+      console.log("NewzViews successfully deleted! UserID: ", user.uid);
+    }).catch(function(error) {
+      console.error("Error removing document: ", error);
+    });
+  }
+});
+
 export const setupNewUser = functions.auth.user().onCreate(async user => {
   // const userRef =  db.collection('UserInfo').doc(user.uid);
   const newzerStatsRef = db.collection('NewzerStats').doc(user.uid);
