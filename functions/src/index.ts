@@ -15,11 +15,11 @@ const bucket = storage.bucket('mobile-ios-pocketnewz.appspot.com');
 
 const db = admin.firestore();
 
-export const deleteUserInfo = functions.auth.user().onDelete(async user => {
+export const deleteUserInfo = functions.auth.user().onDelete(user => {
   const userInfo = db.collection('UserInfo').doc(user.uid);
-  const Stations = db.collection('Stations').doc(user.uid);
-  const RatingsRef = db.collection('RatingsRef').doc(user.uid);
-  const NewzViews = db.collection('NewzViews').doc(user.uid);
+  // const Stations = db.collection('Stations').doc(user.uid);
+  // const RatingsRef = db.collection('RatingsRef').doc(user.uid);
+  // const NewzViews = db.collection('NewzViews').doc(user.uid);
 
   if(userInfo) {
     userInfo.delete().then(() => {
@@ -29,29 +29,29 @@ export const deleteUserInfo = functions.auth.user().onDelete(async user => {
     });
   }
 
-  if(Stations) {
-    Stations.delete().then(() => {
-      console.log("Station successfully deleted! UserID: ", user.uid);
-    }).catch(function(error) {
-      console.error("Error removing document: ", error);
-    });
-  }
+  // if(Stations) {
+  //   Stations.delete().then(() => {
+  //     console.log("Station successfully deleted! UserID: ", user.uid);
+  //   }).catch(function(error) {
+  //     console.error("Error removing document: ", error);
+  //   });
+  // }
 
-  if(RatingsRef) {
-    RatingsRef.delete().then(() => {
-      console.log("RatingsRef successfully deleted! UserID: ", user.uid);
-    }).catch(function(error) {
-      console.error("Error removing document: ", error);
-    });
-  }
+  // if(RatingsRef) {
+  //   RatingsRef.delete().then(() => {
+  //     console.log("RatingsRef successfully deleted! UserID: ", user.uid);
+  //   }).catch(function(error) {
+  //     console.error("Error removing document: ", error);
+  //   });
+  // }
 
-  if(NewzViews) {
-    NewzViews.delete().then(() => {
-      console.log("NewzViews successfully deleted! UserID: ", user.uid);
-    }).catch(function(error) {
-      console.error("Error removing document: ", error);
-    });
-  }
+  // if(NewzViews) {
+  //   NewzViews.delete().then(() => {
+  //     console.log("NewzViews successfully deleted! UserID: ", user.uid);
+  //   }).catch(function(error) {
+  //     console.error("Error removing document: ", error);
+  //   });
+  // }
 });
 
 export const setupNewUser = functions.auth.user().onCreate(async user => {
