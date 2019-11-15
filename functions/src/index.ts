@@ -214,8 +214,10 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
 
       const metricsRef = db.collection('Metrics').doc(newzItem.id);
       await metricsRef.set({
-        views: 0
-      })
+        views: 0,
+        isPublic: newzItem.isPublic,
+        uploadDate: newzItem.uploadDate
+      }, {merge: true});
     } else {
       console.log('There was no newzItem');
     }
