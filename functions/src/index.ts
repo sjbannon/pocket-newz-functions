@@ -301,7 +301,7 @@ export const onNewzDestroyed = functions.firestore.document('Newz/{newzId}').onD
 export const newzRating = functions.https.onCall(async (data, context) => {
   try {
     if (context && context.auth) {
-      var uid = context.auth.uid; // user that is doing the rating
+      const uid = context.auth.uid; // user that is doing the rating
       let newzID = data.newzID; // newz to be rated
       let rating = data.rating; // rating score
 
@@ -340,10 +340,17 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       const newAvg = totalRating / counter;
       await avgRatingRef.set({avgRating: newAvg});
 
+      
+
       // Ratings/-LdFoNAOkv_92w2hhFgu/MyRatings/10N8EB9SdvSDe0loZUwjEHLKFGF3
 
       const ratingsRefRef = db.collection('RatingsRef').doc(uid).collection('MyRatings').doc(newzID);
-      await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`})
+      await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`});
+
+      // Add average rating to Metrics
+      if (db.collection('Metrics').doc(uid)) {
+        db.collection('Metrics').doc(uid).update({avgRating: newAvg});
+      } else db.collection('Metrics').doc(uid).set({avgRating: newAvg});
 
       return { status: 'success', avgRating: newAvg };
     } else {
