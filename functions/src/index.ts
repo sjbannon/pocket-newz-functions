@@ -145,7 +145,7 @@ export const cloneNewzAssets = functions.https.onRequest((request, response) => 
     const [fileObjects] = await bucket.getFiles(options);
     const videoURLs: string[] = [];
     let thumbnailURL;
-    for (var i = 0; i < fileObjects.length; i++) {
+    for (let i = 0; i < fileObjects.length; i++) {
       const file = fileObjects[i];
       const nameArr = file.name.split('/');
       const name = nameArr[nameArr.length - 1];
@@ -348,7 +348,7 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`});
 
       // Add average rating to Metrics
-      db.collection('Metrics').doc(uid).set({avgRating: newAvg}, {merge: true});
+      await db.collection('Metrics').doc(uid).set({avgRating: newAvg}, {merge: true});
 
       return { status: 'success', avgRating: newAvg };
     } else {
@@ -426,7 +426,7 @@ export const followNewzer = functions.https.onCall(async (data, context) => {
     if (context && context.auth) {
       let following = [];
       let followers = 0;
-      var followerId = context.auth.uid; // user that is doing the following
+      const followerId = context.auth.uid; // user that is doing the following
       let followId = data.followID; // user being followed
       console.log('IDs', followerId, followId);
 
@@ -504,7 +504,7 @@ export const followNewzer = functions.https.onCall(async (data, context) => {
 export const shareNewz = functions.https.onCall(async (data, context) => {
   try {
     if (context && context.auth) {
-      var uid = context.auth.uid; // user that is doing the rating
+      const uid = context.auth.uid; // user that is doing the rating
       let newzID = data.newzID; // newz to be rated
 
       console.log('IDs and rating: ', uid, newzID)
@@ -550,8 +550,8 @@ export const shareNewz = functions.https.onCall(async (data, context) => {
 export const viewNewz = functions.https.onCall(async (data, context) => {
   try {
     if (context && context.auth) {
-      var uid = context.auth.uid; // user that is doing the rating
-      let newzID = data.newzID; // newz to be rated
+      const uid = context.auth.uid; // user that is doing the rating
+      const newzID = data.newzID; // newz to be rated
 
       console.log('IDs and rating: ', uid, newzID)
 
@@ -617,7 +617,7 @@ export const viewSharedNewz = functions.https.onRequest((request, response) => {
       console.log('request.body', request.body)
       const newzID = request.body.newzID;
 
-      if (request.method != "POST") {
+      if (request.method !== "POST") {
         response.status(400).send("Incorrect request method.");
         return;
       }
@@ -788,7 +788,7 @@ export const collaboratorAdded = functions.firestore.document('Stations/{userID}
 export const inviteContributor = functions.https.onCall(async (data, context) => {
   try {
     if (context && context.auth) {
-      var uid = context.auth.uid; // user that is doing the rating
+      const uid = context.auth.uid; // user that is doing the rating
       let contributorID = data.uid; // newz to be rated
       let stationID = data.stationID; // rating score
 
@@ -952,7 +952,7 @@ export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}')
 
           console.log('afterStations', afterStations)
 
-          for (var i = 0; i < afterStations.length; i++) {
+          for (let i = 0; i < afterStations.length; i++) {
             stationID = afterStations[i];
             console.log('stationID', stationID)
             stationRefRef = db.collection('StationRef').doc(stationID)
@@ -1014,7 +1014,7 @@ export const requestContentProviderAuth = functions.https.onCall(async (data, co
   
   try {
     if (context && context.auth) {
-      var uid = context.auth.uid; // user that is requesting to post newz
+      const uid = context.auth.uid; // user that is requesting to post newz
 
       if(uid) {
         const userRef = db.collection('UserInfo').doc(uid);
