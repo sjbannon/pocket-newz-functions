@@ -348,9 +348,7 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`});
 
       // Add average rating to Metrics
-      if (db.collection('Metrics').doc(uid)) {
-        db.collection('Metrics').doc(uid).update({avgRating: newAvg});
-      } else db.collection('Metrics').doc(uid).set({avgRating: newAvg});
+      db.collection('Metrics').doc(uid).set({avgRating: newAvg}, {merge: true});
 
       return { status: 'success', avgRating: newAvg };
     } else {
