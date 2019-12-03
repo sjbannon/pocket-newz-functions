@@ -214,9 +214,12 @@ export const onNewzAdded = functions.firestore.document('Newz/{newzId}').onCreat
 
       const metricsRef = db.collection('Metrics').doc(newzItem.id);
       await metricsRef.set({
+        avgRating: 0,
         views: 0,
+        shares: 0,
         isPublic: newzItem.isPublic,
-        uploadDate: newzItem.uploadDate
+        uploadDate: newzItem.uploadDate,
+        categoryID: newzItem.categories
       }, {merge: true});
     } else {
       console.log('There was no newzItem');
@@ -350,7 +353,7 @@ export const newzRating = functions.https.onCall(async (data, context) => {
       await ratingsRefRef.set({ratingsRef: `Ratings/${newzID}/MyRatings/${uid}`});
 
       // Add average rating to Metrics
-      await db.collection('Metrics').doc(uid).set({avgRating: newAvg}, {merge: true});
+      await db.collection('Metrics').doc(newzID).set({avgRating: newAvg}, {merge: true});
 
       return { status: 'success', avgRating: newAvg };
     } else {
@@ -530,6 +533,7 @@ export const shareNewz = functions.https.onCall(async (data, context) => {
 
       if(metricsData) {
         let newzShares = (metricsData.shares || 0) + 1;
+        console.log('setting new shares for: ', newzID, newzShares)
         await metricsRef.set({shares: newzShares || 0},{merge: true});
 
         return { status: 'success', newzShares: newzShares };
@@ -592,8 +596,8 @@ export const viewNewz = functions.https.onCall(async (data, context) => {
 
         if(!newzViewSnap.exists) {
           newViews += 1;
-          await metricsRef.set({views: newViews || 0});
-          await newzViewRef.set({viewed: true})
+          await metricsRef.set({views: newViews || 0}, {merge: true});
+          await newzViewRef.set({viewed: true}, {merge: true})
         }
         return { status: 'success', newViews: newViews };
       } else {
@@ -641,7 +645,7 @@ export const viewSharedNewz = functions.https.onRequest((request, response) => {
           }
 
           newViews += 1;
-          await metricsRef.set({views: newViews || 0});
+          await metricsRef.set({views: newViews || 0}, {merge: true});
 
           response.status(200).send({
             data: {
