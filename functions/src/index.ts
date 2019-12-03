@@ -929,22 +929,67 @@ export const onNewzCollabPosted = functions.firestore.document('/Newz/{newzID}')
     if(afterData && beforeData) {
 
       //TODO check if new stations are public. If any public then we send email
+
+      const beforeTags = beforeData.tagStations || [];
+        const afterTags = afterData.tagStations || [];
+
+        if( beforeTags.sort() !== afterTags.sort() ) {
+          beforeTags.forEach(async (tagStation: string) => {
+            if(!afterTags.includes(tagStation)) {
+              const stationRefRef = db.collection('StationRef').doc(tagStation)
+              const stationSnap = await stationRefRef.get()
+              if(stationSnap) {
+                const stationData = stationSnap.data();
+                if (stationData) {
+                  const count = (stationData.newzCount || 0) - 1;
+                  console.log(`newzCount for ${tagStation}: `, count)
+                  await stationRefRef.set({
+                    newzCount: count
+                  }, {merge: true});
+                } else {
+                  // if it's undefined:
+                  console.log('No document');
+                }
+              }
+            }
+          })
+
+          afterTags.forEach(async (tagStation: string) => {
+            if(!beforeTags.includes(tagStation)) {
+              const stationRefRef = db.collection('StationRef').doc(tagStation)
+              const stationSnap = await stationRefRef.get()
+              if(stationSnap) {
+                const stationData = stationSnap.data();
+                if (stationData) {
+                  const count = (stationData.newzCount || 0) + 1;
+                  console.log(`newzCount for ${tagStation}: `, count)
+                  await stationRefRef.set({
+                    newzCount: count
+                  }, {merge: true});
+                } else {
+                  // if it's undefined:
+                  console.log('No document');
+                }
+              }
+            }
+          })
+        }
       
       if(afterData.ownerID !== afterData.posterID) {        
         const beforeStations = beforeData.stationIDs;
         const afterStations = afterData.stationIDs;
 
-        for (const tagStation of afterData.tagStations) {
-          db.collection('StationRef').doc(tagStation).get().then((doc) => {
-            if (doc.exists) {
-              doc.data()!.newzCount += 1;
-              console.log(`newzCount fo ${tagStation}: `, doc.data()!.newzCount)
-            } else {
-              // if it's undefined:
-              console.log('No document');
-          }
-          }).catch(error => console.log(error));
-        }
+        // for (const tagStation of afterData.tagStations) {
+        //   db.collection('StationRef').doc(tagStation).get().then((doc) => {
+        //     if (doc.exists) {
+        //       doc.data()!.newzCount += 1;
+        //       console.log(`newzCount fo ${tagStation}: `, doc.data()!.newzCount)
+        //     } else {
+        //       // if it's undefined:
+        //       console.log('No document');
+        //   }
+        //   }).catch(error => console.log(error));
+        // }
 
         if(beforeStations.sort() !== afterStations.sort()) {
           let stationNames: string[] = [];
